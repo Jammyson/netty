@@ -24,6 +24,8 @@ import io.netty.util.UncheckedBooleanSupplier;
 /**
  * Default implementation of {@link MaxMessagesRecvByteBufAllocator} which respects {@link ChannelConfig#isAutoRead()}
  * and also prevents overflow.
+ *
+ * MaxMessagesRecvByteBufAllocator的默认实现,主要用来防止溢出
  */
 public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessagesRecvByteBufAllocator {
     private volatile int maxMessagesPerRead;

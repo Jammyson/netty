@@ -30,14 +30,23 @@ import java.net.SocketAddress;
 /**
  * A nexus to a network socket or a component which is capable of I/O
  * operations such as read, write, connect, and bind.
+ * <trans>
+ *     用于抽象socket，并且封装对socket的所有IO操作,简化对socket的处理.即Socket的包装抽象
+ * </trans>
+ *
  * <p>
  * A channel provides a user:
  * <ul>
  * <li>the current state of the channel (e.g. is it open? is it connected?),</li>
  * <li>the {@linkplain ChannelConfig configuration parameters} of the channel (e.g. receive buffer size),</li>
  * <li>the I/O operations that the channel supports (e.g. read, write, connect, and bind), and</li>
- * <li>the {@link ChannelPipeline} which handles all I/O events and requests
- *     associated with the channel.</li>
+ * <li>
+ *     the {@link ChannelPipeline} which handles all I/O events and requests
+ *     associated with the channel.
+ *     <trans>
+ *         封装当channel产生事件后,用于处理事件和请求的ChannelPipeline.
+ *     </trans>
+ * </li>
  * </ul>
  *
  * <h3>All I/O operations are asynchronous.</h3>
@@ -47,6 +56,10 @@ import java.net.SocketAddress;
  * been completed at the end of the call.  Instead, you will be returned with
  * a {@link ChannelFuture} instance which will notify you when the requested I/O
  * operation has succeeded, failed, or canceled.
+ * <trans>
+ *     Netty中所有的IO操作都是异步的.对于任何IO调用,Netty都会立马返回,当IO操作执行完毕后,会通过
+ *     ChannelFuture封装IO操作结果.
+ * </trans>
  *
  * <h3>Channels are hierarchical</h3>
  * <p>
@@ -73,6 +86,9 @@ import java.net.SocketAddress;
  * It is important to call {@link #close()} or {@link #close(ChannelPromise)} to release all
  * resources once you are done with the {@link Channel}. This ensures all resources are
  * released in a proper way, i.e. filehandles.
+ * <trans>
+ *     当使用完Channel必须要显示的调用close()方法释放所有的资源,保证所有的资源都是以正确的方式被释放.
+ * </trans>
  */
 public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparable<Channel> {
 

@@ -106,36 +106,159 @@ import java.util.Deque;
 final class PoolChunk<T> implements PoolChunkMetric {
 
     private static final int INTEGER_SIZE_MINUS_ONE = Integer.SIZE - 1;
-
+    /**
+     * <note>
+     *     PoolArena所代表的抽象就是netty内存池.
+     *     这个属性用于记录当前PoolChunk属于哪个内存池.
+     * </note>
+     */
     final PoolArena<T> arena;
+    /**
+     * <note>
+     *      PoolChunk声请的内存形式.
+     *          对于堆内存，T就是一个byte数组
+     *          对于直接内存，T就是ByteBuffer，
+     *      无论是哪种形式，PoolChunk内存大小都默认是16M
+     * </note>
+     */
     final T memory;
+    /**
+     * <note>
+     *     指定当前PoolChunk是否使用内存池的方式进行管理.
+     *     PoolChunk是Netty声请的内存块Chunk的抽象,它既可以被内存池PoolArena管理,也可以独立使用不适用内存池管理
+     * </note>
+     */
     final boolean unpooled;
+    /**
+     * <note>
+     *     PoolChunk内存块中声请用于站位，PoolChunk代表的整个内存块大小为16M+offset.
+     *     默认该值为0
+     * </note>
+     */
     final int offset;
+    /**
+     * <note>
+     *     PoolChunk会被维护成完全二叉树形式,memoryMap用于存储PoolChunk每个节点
+     *     的以树的层高为值的内存分配情况,比如0=16M,1=8M等等以此类推,完全二叉树节点
+     *     表示的存储容量是子节点之和.
+     *     与depthMap不同的是,memoryMap是用于存储PoolChunk当前的内存分配情况,它
+     *     在初始化时会与depthMap相等,随着PoolChunk的内存被分配,memoryMap所维护
+     *     的"剩余容量"完全二叉树的节点值将会改变.
+     *
+     *     在进行内存分配时，会从头结点开始比较，然后比较左子节点，然后比较右
+     *     子节点，直到找到能够代表目标内存块的节点。
+     *     当某个节点所代表的内存被申请之后，该节点的值就会被标记为12(大于默认最大层高11)，
+     *     表示该节点已经被占用
+     * </note>
+     */
     private final byte[] memoryMap;
+    /**
+     * <note>
+     *     PoolChunk会被维护成完全二叉树形式,depthMap用于存储完全二叉树中
+     *     所有节点的初始化层高,默认情况下PoolChunk会声请16M内存,所以
+     *     depthMap.length=4096.depthMap初始化完毕后将不会再更改.
+     *     它的主要作用在于通过目标索引位置值找到其在整棵树中的标准层数(初始化未被分配过的层数)
+     * </note>
+     */
     private final byte[] depthMap;
+    /**
+     * <note>
+     *    每一个PoolSubPage都代表二叉树的一个叶子节点，当二叉树叶节点
+     *    内存被单独分配之后(申请小于等于8kb的情况)，会使用一个PoolSubPage进行封装
+     * </note>
+     */
     private final PoolSubpage<T>[] subpages;
-    /** Used to determine if the requested capacity is equal to or greater than pageSize. */
+    /**
+     * <note>
+     *     用于判断用户声请的内存大小的值是否大于等于pageSize(默认为8KB=8192B).
+     *     subpageOverflowMask的值为-8192，二进制表示为11111111111111111110000000000000，0的个数正好为12,
+     *     而2^12=8192，所以Netty将其与申请的内存大小进行“与运算“，如果结果不为0则表示申请的内存大于8192，从而
+     *     快速判断出通过PoolSubPage的方式声请内存还是通过内存计算的方式。
+     * </note>
+     */
     private final int subpageOverflowMask;
+    /**
+     * <note>
+     *    记录叶节点大小，默认为8KB=8192B
+     * </note>
+     */
     private final int pageSize;
+    /**
+     * <note>
+     *    叶节点偏移量，默认为13。主要用于待声请的内存大小可以在内存池的哪一层被声请到，算法为：
+     *    int d = maxOrder - (log2(normCapacity) - pageShifts);
+     *    比如9KB，经过log2(9KB)得到14，maxOrder为11，计算就得到10，表示9KB内存在内存池中为第10层的数据
+     * </note>
+     */
     private final int pageShifts;
+    /**
+     * <note>
+     *    默认为11，表示当前最大层数
+     * </note>
+     */
     private final int maxOrder;
+    /**
+     * <note>
+     *    记录当前整个PoolChunk申请的内存大小，默认为16M
+     * </note>
+     */
     private final int chunkSize;
+    /**
+     * <note>
+     *    将chunkSize取2的对数，默认为24
+     * </note>
+     */
     private final int log2ChunkSize;
+    /**
+     * <note>
+     *    代表叶节点的PoolSubPage数组的初始化length
+     * </note>
+     */
     private final int maxSubpageAllocs;
     /** Used to mark memory as unusable */
+    /**
+     * <note>
+     *   指定某个节点如果已经被申请，那么其值将被标记为unusable所指定的值.比如说12
+     * </note>
+     */
     private final byte unusable;
-
-    // Use as cache for ByteBuffer created from the memory. These are just duplicates and so are only a container
-    // around the memory itself. These are often needed for operations within the Pooled*ByteBuf and so
-    // may produce extra GC, which can be greatly reduced by caching the duplicates.
-    //
-    // This may be null if the PoolChunk is unpooled as pooling the ByteBuffer instances does not make any sense here.
+    /**
+     *  Use as cache for ByteBuffer created from the memory. These are just duplicates and so are only a container
+     *  around the memory itself. These are often needed for operations within the Pooled*ByteBuf and so
+     *  may produce extra GC, which can be greatly reduced by caching the duplicates.
+     *  This may be null if the PoolChunk is unpooled as pooling the ByteBuffer instances does not make any sense here.
+     * <note>
+     *    用于缓存已创建的ByteBuffer.Netty中所有的内存都是以ByteBuffer进行传递的。
+     *    在分配内存时，Netty会将分配到的内存的起始值和偏移量使用ByteBuffer封装，交给用户使用。
+     *    这也意味着申请多次内存，只要将同一个ByteBuffer中的数据进行重置，就可以复用这个ByteBuffer。
+     *    cachedNioBuffers的作用就是缓存这些ByteBuffer对象，减少ByteBuffer的重复创建.
+     * </note>
+     */
     private final Deque<ByteBuffer> cachedNioBuffers;
-
+    /**
+     * <note>
+     *     记录当前PoolChunk中还剩余的可申请字节数
+     * </note>
+     */
     private int freeBytes;
-
+    /**
+     * <note>
+     *     Netty内存池中,所有的PoolChunk都是由内存池中的PoolChunkList统一维护,是一个双向链表.
+     *     这个引用指向的是内存池中维护当前PoolChunk的链表
+     * </note>
+     */
     PoolChunkList<T> parent;
+    /**
+     * <note>
+     *     前置节点PoolChunk
+     * </note>
+     */
     PoolChunk<T> prev;
+    /**
+     * <note>
+     *     后置节点PoolChunk
+     * </note>
+     */
     PoolChunk<T> next;
 
     // TODO: Test if adding padding helps under contention
@@ -222,18 +345,58 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return 100 - freePercentage;
     }
 
+    /**
+     * 执行内存分配
+     * @param buf  用于封装分配成功的内存
+     * @param reqCapacity  请求声请的内存容量
+     * @param normCapacity  规整后的内存容量,内存声请的容量会被规整为向上取整到2的幂次
+     * @return  是否分配成功
+     */
     boolean allocate(PooledByteBuf<T> buf, int reqCapacity, int normCapacity) {
         final long handle;
-        if ((normCapacity & subpageOverflowMask) != 0) { // >= pageSize
-            handle =  allocateRun(normCapacity);
+        /**
+         * <note>
+         *   subpageOverflowMask=-8192，用于判断待声请容量是否大于8KB。如果结果不为0则表示申请的内存大于8KB.
+         *   返回的long型的handle，它由两部分组成：
+         *      低位4个字节表示normCapacity分配的内存在PoolChunk中所分配的节点在memoryMap数组中的下标索引；
+         *      高位4个字节表示分配的内存在PoolSubPage中占据的8KB内存中的BitMap索引，即分配的内存占用PoolSubPage中的哪一部分的内存。
+         *   1、对于大于8KB的内存分配会直接在PoolChunk的二叉树上进行分配,即会分配多个PoolSubPage,所以高位四个字节的位图索引为0。
+         *   低位的4个字节仍然表示目标内存节点在memoryMap中的位置索引；
+         *   2、对于低于8KB的内存分配只占用PoolSubPage的一部分，所以需要使用BitMap索引来标识目标内存
+         * </note>
+         */
+        if ((normCapacity & subpageOverflowMask) != 0) {
+            /**
+             * <note>
+             *      申请大于8KB的内存。将会从MemoryMap所代表的二叉树中搜索节点，如果找到了能够
+             *      分配的节点则会把二叉树中找到的节点标记为已占用。
+             *      如果当前PoolChunk不足以分配待声请的内存大小，那么将会返回-1
+             *      如果可以分配足够的大小，则返回分配到的memoryMap中节点的索引值
+             * </note>
+             *
+             */
+            handle = allocateRun(normCapacity);
         } else {
+            // 申请小于等于8KB的内存
             handle = allocateSubpage(normCapacity);
         }
 
+        /**
+         * <note>
+         *     如果handle小于0，则表示要申请的内存大小超过了当前PoolChunk剩余容量的最大内存大小,也即16M，
+         *     所以返回false，不由当前PoolChunk进行分配。
+         * </note>
+         */
         if (handle < 0) {
             return false;
         }
+
+        // 从缓存的ByteBuf对象池中获取一个ByteBuf对象，不存在则复制null.
         ByteBuffer nioBuffer = cachedNioBuffers != null ? cachedNioBuffers.pollLast() : null;
+        /**
+         * 通过申请到的内存数据handle,对nioBuffer进行重置，如果nioBuffer为null，则创建一个新的然后进行初始化。
+         * 本质上就是首先计算申请到的内存块的起始位置地址值，以及申请的内存块的长度，然后将其设置到一个ByteBuf对象中,以对其进行重置.
+         */
         initBuf(buf, nioBuffer, handle, reqCapacity);
         return true;
     }
@@ -286,45 +449,93 @@ final class PoolChunk<T> implements PoolChunkMetric {
     /**
      * Algorithm to allocate an index in memoryMap when we query for a free node
      * at depth d
+     * <trans>
+     *     从目标层数d开始，在memoryMap中查找并分配出一个可用node的算法.
+     * </trans>
+     * <note>
+     *     算法的逻辑为：从父节点、左子节点、右子节点的方式依次判断节点的当前层数(MemoryMap)是否与目标层数相等，
+     *     如果相等，则将该节点所对应的在memoryMap数组中的位置索引返回
+     * </note>
      *
-     * @param d depth
+     * @param d depth   目标层数
      * @return index in memoryMap
+     *      若找到了与目标层数d相等的节点，则返回节点在memoryMap中的索引
+     *      若当前PoolChunk不足以分配d(找不到d)，将返回-1
      */
     private int allocateNode(int d) {
-        int id = 1;
+        int id = 1;   // 起点为1
         int initial = - (1 << d); // has last d bits = 0 and rest all = 1
+        // 获取memoryMap中索引为id上的层数值，初始时获取的就是根节点的层数
         byte val = value(id);
+        // 如果d小于根节点层数值，说明当前PoolChunk中没有足够的内存用于分配目标内存，直接返回-1
         if (val > d) { // unusable
             return -1;
         }
+
+        /**
+         * 比较树节点的值是否比待分配目标节点的值要小，如果要小，则说明当前节点所代表的子树
+         * 是能够分配目标内存大小的，则会继续遍历其左子节点，然后遍历右子节点
+         */
         while (val < d || (id & initial) == 0) { // id & initial == 1 << d for all ids at depth d, for < d it is 0
             id <<= 1;
             val = value(id);
             if (val > d) {
+                /**
+                 * val > d 表示当前节点的数值比目标数值要大，也就是说当前节点的容量不足以申请到目标容量的内存，
+                 * 那么就会执行 id ^= 1，即将id切换到当前节点的兄弟节点。
+                 * 本质上其实就是从二叉树的左子节点开始查找，如果左子节点无法分配
+                 * 目标大小的内存，那么就到右子节点进行查找
+                 */
                 id ^= 1;
                 val = value(id);
             }
         }
+
+        // 跳出循环意味着已经找到了目标节点的索引(id)，则获取节点所在层数
         byte value = value(id);
         assert value == d && (id & initial) == 1 << d : String.format("val = %d, id & initial = %d, d = %d",
                 value, id & initial, d);
+        // 将id标记为已被占用
         setValue(id, unusable); // mark as unusable
+        /**
+         * 更新整棵树节点的值，使其继续保持
+         * ”父节点的层数所代表的内存大小是未分配的子节点的层数所代表的内存之和“。
+         */
         updateParentsAlloc(id);
         return id;
     }
 
     /**
      * Allocate a run of pages (>=1)
+     * <trans>
+     *     申请大于或等于1个page的内存容量
+     * </trans>
      *
-     * @param normCapacity normalized capacity
+     * @param normCapacity normalized capacity  规整后的容量
      * @return index in memoryMap
+     *      申请的容量在memoryMap中的索引位置。如果当前PoolChunk无法分配足够的内存，则返回-1
      */
     private long allocateRun(int normCapacity) {
+        /**
+         * log2(normCapacity)：会将申请的内存大小转换为大于该大小的第一个2的指数次幂数然后取2的对数的形式，比如log2(9KB)转换之后为14，这是因为大于9KB的第一个2的指数
+         * 次幂为16384，取2的对数后为14。
+         * 计算申请的目标内存（normCapacity）可以被申请到的在二叉树中需要的层数。
+         */
         int d = maxOrder - (log2(normCapacity) - pageShifts);
+        /**
+         * 从MemoryMap所代表的二叉树中搜索节点，如果找到了与目标层数相等的节点，则会标记节点为已占用，并返回索引值。
+         * 如果当前PoolChunk不足以分配待声请的内存大小，那么将会返回-1
+         */
         int id = allocateNode(d);
+        /**
+         * 如果返回值小于0，则说明当前PoolChunk中无法分配目标大小的内存.
+         *      1、由于目标内存大于16M
+         *      2、当前PoolChunk剩余可分配的内存不足以分配目标内存大小
+         */
         if (id < 0) {
             return id;
         }
+        // 更新剩余可分配内存的值
         freeBytes -= runLength(id);
         return id;
     }
@@ -339,27 +550,40 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private long allocateSubpage(int normCapacity) {
         // Obtain the head of the PoolSubPage pool that is owned by the PoolArena and synchronize on it.
         // This is need as we may add it back and so alter the linked-list structure.
+        /**
+         * // 这里其实也是与PoolThreadCache中存储PoolSubpage的方式相同，也是采用分层的方式进行存储的，
+         * 取目标数组中哪一个元素的PoolSubpage则是根据目标容量normCapacity来进行的。
+         * 查找当前申请的容量所适用的PoolSubpage.
+         *
+         */
         PoolSubpage<T> head = arena.findSubpagePoolHead(normCapacity);
+        // 赋值d为memoryMap的最大层数，它的目的是为了分配一个最小单位的内存块page.
         int d = maxOrder; // subpages are only be allocated from pages i.e., leaves
         synchronized (head) {
+            // 从memoryMap中分配出一个最小内存块
             int id = allocateNode(d);
+            // 如果无法分配成功，则返回id，即-1
             if (id < 0) {
                 return id;
             }
 
             final PoolSubpage<T>[] subpages = this.subpages;
             final int pageSize = this.pageSize;
-
+            // 计算当前PoolChunk剩余内存大小
             freeBytes -= pageSize;
-
+            // 计算分配的id索引在PoolSubpage数组中的位置
             int subpageIdx = subpageIdx(id);
             PoolSubpage<T> subpage = subpages[subpageIdx];
+            // 如果对应的索引为上没有subpage
             if (subpage == null) {
+                // 创建一个PoolSubpage并交给subpages管理
                 subpage = new PoolSubpage<T>(head, this, id, runOffset(id), pageSize, normCapacity);
                 subpages[subpageIdx] = subpage;
             } else {
                 subpage.init(head, normCapacity);
             }
+
+            // 在PoolSubpage申请一块内存，并且返回代表该内存块的位图索引
             return subpage.allocate();
         }
     }
@@ -369,19 +593,25 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * When a subpage is freed from PoolSubpage, it might be added back to subpage pool of the owning PoolArena
      * If the subpage pool in PoolArena has at least one other PoolSubpage of given elemSize, we can
      * completely free the owning Page so it is available for subsequent allocations
+     * <trans>
+     *     判断其是否小于8KB，如果低于8KB，则将其交由PoolSubpage进行处理，否则就通过二叉树的方式对其进行重置。
+     * </trans>
      *
      * @param handle handle to free
      */
     void free(long handle, ByteBuffer nioBuffer) {
+        // 获取handle代表的内存块在memoryMap数组中的位置
         int memoryMapIdx = memoryMapIdx(handle);
+        // 获取handle代表的当前内存块的位图索引
         int bitmapIdx = bitmapIdx(handle);
 
-        if (bitmapIdx != 0) { // free a subpage
+        // 如果存在位图索引，意味着这个内存块是由PoolSubPage进行管理的，那么就释放SubPage中的内存块
+        if (bitmapIdx != 0) {
+            // 获取到subPage
             PoolSubpage<T> subpage = subpages[subpageIdx(memoryMapIdx)];
             assert subpage != null && subpage.doNotDestroy;
 
-            // Obtain the head of the PoolSubPage pool that is owned by the PoolArena and synchronize on it.
-            // This is need as we may add it back and so alter the linked-list structure.
+            // 释放内存
             PoolSubpage<T> head = arena.findSubpagePoolHead(subpage.elemSize);
             synchronized (head) {
                 if (subpage.free(head, bitmapIdx & 0x3FFFFFFF)) {
@@ -389,10 +619,16 @@ final class PoolChunk<T> implements PoolChunkMetric {
                 }
             }
         }
+
+        // 走到这里说明需要释放的内存大于8KB，不是由SubPage管理，而是直接在memoryMap上进行分配的
+        // 首先还原当前剩余的内存大小
         freeBytes += runLength(memoryMapIdx);
+        // 重置释放内存块的二叉树节点
         setValue(memoryMapIdx, depth(memoryMapIdx));
+        // 将要释放的内存块所对应的二叉树的各级父节点的值进行更新
         updateParentsFree(memoryMapIdx);
 
+        // 将创建的ByteBuf对象释放到缓存池中，以便下次申请时复用
         if (nioBuffer != null && cachedNioBuffers != null &&
                 cachedNioBuffers.size() < PooledByteBufAllocator.DEFAULT_MAX_CACHED_BYTEBUFFERS_PER_CHUNK) {
             cachedNioBuffers.offer(nioBuffer);

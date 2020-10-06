@@ -15,6 +15,7 @@
  */
 package io.netty.channel;
 
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.EventExecutorChooserFactory;
@@ -29,6 +30,9 @@ import java.util.concurrent.ThreadFactory;
 /**
  * Abstract base class for {@link EventLoopGroup} implementations that handles their tasks with multiple threads at
  * the same time.
+ * <trans>
+ *     提供并发处理task的能力的EventLoopGroup抽象实现类
+ * </trans>
  */
 public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutorGroup implements EventLoopGroup {
 
@@ -37,7 +41,12 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
     private static final int DEFAULT_EVENT_LOOP_THREADS;
 
     static {
+        /**
+         * 如果"io.netty.eventLoopThreads"系统属性(可设置)有值,则使用这个值;
+         * 如果没有设置线程数，则取当前计算机CPU核心数的两倍,
+         */
         DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
+                // 获取核心线程数是对JDK的一个封装：Runtime.getRuntime().availableProcessors()
                 "io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
 
         if (logger.isDebugEnabled()) {
@@ -46,9 +55,15 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
     }
 
     /**
+     * @param nThreads  线程池线程数
+     * @param executor  线程池executor
+     * {@link NioEventLoopGroup#NioEventLoopGroup(int, java.util.concurrent.Executor, java.nio.channels.spi.SelectorProvider, io.netty.channel.SelectStrategyFactory)}
      * @see MultithreadEventExecutorGroup#MultithreadEventExecutorGroup(int, Executor, Object...)
-     */
+     **/
     protected MultithreadEventLoopGroup(int nThreads, Executor executor, Object... args) {
+        /**
+         * DEFAULT_EVENT_LOOP_THREADS的默认值为当前计算机CPU核心 * 2
+         */
         super(nThreads == 0 ? DEFAULT_EVENT_LOOP_THREADS : nThreads, executor, args);
     }
 

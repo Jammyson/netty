@@ -68,10 +68,12 @@ public class DefaultChannelConfig implements ChannelConfig {
     private volatile boolean pinEventExecutor = true;
 
     public DefaultChannelConfig(Channel channel) {
+        // channel为ServerSocketChannel
         this(channel, new AdaptiveRecvByteBufAllocator());
     }
 
     protected DefaultChannelConfig(Channel channel, RecvByteBufAllocator allocator) {
+        // 传入buffer容量预测者,和当前channel的描述信息
         setRecvByteBufAllocator(allocator, channel.metadata());
         this.channel = channel;
     }
@@ -305,11 +307,14 @@ public class DefaultChannelConfig implements ChannelConfig {
      * is of type {@link MaxMessagesRecvByteBufAllocator}.
      */
     private void setRecvByteBufAllocator(RecvByteBufAllocator allocator, ChannelMetadata metadata) {
+        // allocator为AdaptiveRecvByteBufAllocator
         if (allocator instanceof MaxMessagesRecvByteBufAllocator) {
+            // 为RecvByteBufAllocator设置一个最大值防止溢出
             ((MaxMessagesRecvByteBufAllocator) allocator).maxMessagesPerRead(metadata.defaultMaxMessagesPerRead());
         } else if (allocator == null) {
             throw new NullPointerException("allocator");
         }
+        // 赋值
         setRecvByteBufAllocator(allocator);
     }
 

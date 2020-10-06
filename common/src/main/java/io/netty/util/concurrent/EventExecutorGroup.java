@@ -25,7 +25,12 @@ import java.util.concurrent.TimeUnit;
  * The {@link EventExecutorGroup} is responsible for providing the {@link EventExecutor}'s to use
  * via its {@link #next()} method. Besides this, it is also responsible for handling their
  * life-cycle and allows shutting them down in a global fashion.
- *
+ * <trans>
+ *     EventExecutorGroup提供next()用于获取EventExecutor,以及对EventExecutor进行管理.
+ *     通过EventExecutorGroup实现类可以看出,EventExecutorGroup支持提交task,并且由EventExecutorGroup
+ *     负责选择一个EventExecutor执行task.
+ *     同时要注意到的是,它继承了ScheduledExecutorService,说明EventExecutorGroup是多线程的.
+ * </trans>
  */
 public interface EventExecutorGroup extends ScheduledExecutorService, Iterable<EventExecutor> {
 
@@ -61,6 +66,9 @@ public interface EventExecutorGroup extends ScheduledExecutorService, Iterable<E
     /**
      * Returns the {@link Future} which is notified when all {@link EventExecutor}s managed by this
      * {@link EventExecutorGroup} have been terminated.
+     * <trans>
+     *     当EventExecutorGroup所管理的所有EventExecutor都已经被终止时,将会返回一个Future
+     * </trans>
      */
     Future<?> terminationFuture();
 

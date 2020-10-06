@@ -21,7 +21,13 @@ import io.netty.channel.socket.ServerSocketChannel;
  * A {@link Channel} that accepts an incoming connection attempt and creates
  * its child {@link Channel}s by accepting them.  {@link ServerSocketChannel} is
  * a good example.
+ * 一个接收传进来的连接请求的channel,然后接收它们来创建出子channel
  */
 public interface ServerChannel extends Channel {
     // This is a tag interface.
+    // mark interface，也叫做标记接口
+
+    /**
+     * 一个重要的实现类：NioServerChannel
+     */
 }

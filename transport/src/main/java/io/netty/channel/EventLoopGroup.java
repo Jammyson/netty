@@ -20,7 +20,10 @@ import io.netty.util.concurrent.EventExecutorGroup;
 /**
  * Special {@link EventExecutorGroup} which allows registering {@link Channel}s that get
  * processed for later selection during the event loop.
- *
+ * <trans>
+ *     用于注册和管理Channel,并且在Channel产生事件时能够对事件进行处理.EventExecutorGroup
+ *     会对EventLoop进行管理和调度,它本身不处理Channel产生的事件,而是分发(dispatch)EventLoop模型去处理.
+ * </trans>
  */
 public interface EventLoopGroup extends EventExecutorGroup {
     /**

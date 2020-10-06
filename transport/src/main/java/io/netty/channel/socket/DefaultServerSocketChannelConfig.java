@@ -50,6 +50,7 @@ public class DefaultServerSocketChannelConfig extends DefaultChannelConfig
         if (javaSocket == null) {
             throw new NullPointerException("javaSocket");
         }
+        // 将与ServerSocketChannel关联的ServerSocket进行赋值
         this.javaSocket = javaSocket;
     }
 

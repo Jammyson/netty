@@ -24,6 +24,7 @@ import java.util.Map;
 
 /**
  * A set of configuration properties of a {@link Channel}.
+ * 一个Channel的配置属性
  * <p>
  * Please down-cast to more specific configuration type such as
  * {@link SocketChannelConfig} or use {@link #setOptions(Map)} to set the

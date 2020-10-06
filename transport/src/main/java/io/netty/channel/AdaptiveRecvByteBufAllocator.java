@@ -25,12 +25,17 @@ import static java.lang.Math.min;
 /**
  * The {@link RecvByteBufAllocator} that automatically increases and
  * decreases the predicted buffer size on feed back.
+ * 根据反馈来增大或减小预测的buffer容量的RecvByteBufAllocator实现类
  * <p>
  * It gradually increases the expected number of readable bytes if the previous
- * read fully filled the allocated buffer.  It gradually decreases the expected
- * number of readable bytes if the read operation was not able to fill a certain
- * amount of the allocated buffer two times consecutively.  Otherwise, it keeps
- * returning the same prediction.
+ * read fully filled the allocated buffer.
+ * 如果之前的读操作完全填满了声请的buffer,那么它会逐渐的增大可以容量的读的字节数.
+ * It gradually decreases the expected number of readable bytes if the read operation was not able to fill a certain
+ * amount of the allocated buffer two times consecutively.
+ *
+ * Otherwise, it keeps returning the same prediction.
+ *
+ * 这个类就是用来返回读buffer的预测容量的,然后可以根据这个容量来申请新的buffer
  */
 public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufAllocator {
 
@@ -151,6 +156,8 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
      * Creates a new predictor with the default parameters.  With the default
      * parameters, the expected buffer size starts from {@code 1024}, does not
      * go down below {@code 64}, and does not go up above {@code 65536}.
+     *
+     * 创建一个使用默认参数创建的预测器.默认参数创建的期望buffer的容量初始值为1024,最小值为64,最大值为65536.
      */
     public AdaptiveRecvByteBufAllocator() {
         this(DEFAULT_MINIMUM, DEFAULT_INITIAL, DEFAULT_MAXIMUM);

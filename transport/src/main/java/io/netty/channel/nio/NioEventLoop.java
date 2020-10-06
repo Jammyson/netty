@@ -52,7 +52,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * {@link SingleThreadEventLoop} implementation which register the {@link Channel}'s to a
  * {@link Selector} and so does the multi-plexing of these in the event loop.
- *
+ * <trans>
+ *      SingleThreadEventLoop的实现类.NioEventLoop会将Channel注册到Selector上 - 即IO多路复用模型的实现
+ * </trans>
  */
 public final class NioEventLoop extends SingleThreadEventLoop {
 

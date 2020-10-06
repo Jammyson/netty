@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * {@link Bootstrap} sub-class which allows easy bootstrap of {@link ServerChannel}
+ * 启动它的子类来很容易的启动一个ServerChannel
  *
  */
 public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerChannel> {
@@ -70,16 +71,21 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * ServerBootstrap的方法链风格,返回自身相当于设置.
+     * 设置两个EventLoopGroup - parent和child.这些EventLoopGroup是用来处理所有的事件和ServerChannel以及channel的IO.
+     *
      * Set the {@link EventLoopGroup} for the parent (acceptor) and the child (client). These
      * {@link EventLoopGroup}'s are used to handle all the events and IO for {@link ServerChannel} and
      * {@link Channel}'s.
      */
     public ServerBootstrap group(EventLoopGroup parentGroup, EventLoopGroup childGroup) {
+        // AbstractBootstrap中保存bossGroup
         super.group(parentGroup);
         ObjectUtil.checkNotNull(childGroup, "childGroup");
         if (this.childGroup != null) {
             throw new IllegalStateException("childGroup set already");
         }
+        // ServerBootStrap中保存childGroup
         this.childGroup = childGroup;
         return this;
     }
@@ -115,17 +121,23 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     /**
      * Set the {@link ChannelHandler} which is used to serve the request for the {@link Channel}'s.
+     *
+     * 设置一个服务于Channel(workGroup)的请求的ChannelHandler
      */
     public ServerBootstrap childHandler(ChannelHandler childHandler) {
         this.childHandler = ObjectUtil.checkNotNull(childHandler, "childHandler");
         return this;
     }
 
+    // TODO 待注释
     @Override
     void init(Channel channel) {
+        // 设置ChannelOption - options,ChannelOption是用来
         setChannelOptions(channel, options0().entrySet().toArray(newOptionArray(0)), logger);
+        // 设置Attributes - attrs
         setAttributes(channel, attrs0().entrySet().toArray(newAttrArray(0)));
 
+        // 获取到pipline,准备添加channel初始化器
         ChannelPipeline p = channel.pipeline();
 
         final EventLoopGroup currentChildGroup = childGroup;
@@ -134,12 +146,15 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                 childOptions.entrySet().toArray(newOptionArray(0));
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = childAttrs.entrySet().toArray(newAttrArray(0));
 
+        // 添加一个ChannelInitializer初始化器
         p.addLast(new ChannelInitializer<Channel>() {
             @Override
             public void initChannel(final Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
+                // 返回AbstractBootstrap中的ChannelHandler
                 ChannelHandler handler = config.handler();
                 if (handler != null) {
+                    // 添加进pipLine
                     pipeline.addLast(handler);
                 }
 

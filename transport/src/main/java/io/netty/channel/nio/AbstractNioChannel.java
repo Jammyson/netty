@@ -71,6 +71,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     /**
      * Create a new instance
+     * 为传进来的ServerSocketChannel注册一个接收事件
      *
      * @param parent            the parent {@link Channel} by which this instance was created. May be {@code null}
      * @param ch                the underlying {@link SelectableChannel} on which it operates

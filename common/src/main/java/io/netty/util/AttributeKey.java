@@ -19,6 +19,8 @@ package io.netty.util;
  * Key which can be used to access {@link Attribute} out of the {@link AttributeMap}. Be aware that it is not be
  * possible to have multiple keys with the same name.
  *
+ * 能够被允许在AttributeMap外部访问Attribute的key.多个key不可能有一样的名称.
+ *
  * @param <T>   the type of the {@link Attribute} which can be accessed via this {@link AttributeKey}.
  */
 @SuppressWarnings("UnusedDeclaration") // 'T' is used only at compile time

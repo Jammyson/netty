@@ -74,6 +74,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * The {@link EventLoopGroup} which is used to handle all the events for the to-be-created
+     * 设置一个EventLoopGroup用来处理所有要创建一个Channel的事件.
      * {@link Channel}
      */
     public B group(EventLoopGroup group) {
@@ -87,6 +88,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     @SuppressWarnings("unchecked")
     private B self() {
+        // 从子类的ServerBootStrap声明的泛型来看,这个地方返回的是ServerBootStrap
         return (B) this;
     }
 
@@ -94,6 +96,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * The {@link Class} which is used to create {@link Channel} instances from.
      * You either use this or {@link #channelFactory(io.netty.channel.ChannelFactory)} if your
      * {@link Channel} implementation has no no-args constructor.
+     *
+     * 接收一个Class类型来创建一个Channel对象 - 前提：Channel有无参构造函数
+     * 返回值是一个
      */
     public B channel(Class<? extends C> channelClass) {
         return channelFactory(new ReflectiveChannelFactory<C>(
@@ -110,7 +115,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         if (this.channelFactory != null) {
             throw new IllegalStateException("channelFactory set already");
         }
-
+        // 把ChannelFactory实例进行赋值
         this.channelFactory = channelFactory;
         return self();
     }
@@ -121,6 +126,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * is not working for you because of some more complex needs. If your {@link Channel} implementation
      * has a no-args constructor, its highly recommend to just use {@link #channel(Class)} to
      * simplify your code.
+     *
+     * 用于当调用bind()方法的时候创建一个Channel实例.
      */
     @SuppressWarnings({ "unchecked", "deprecation" })
     public B channelFactory(io.netty.channel.ChannelFactory<? extends C> channelFactory) {
@@ -229,6 +236,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * Create a new {@link Channel} and bind it.
+     *
+     * 服务器真正的启动.创建一个新的Channel然后绑定端口
      */
     public ChannelFuture bind(int inetPort) {
         return bind(new InetSocketAddress(inetPort));
@@ -252,6 +261,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(SocketAddress localAddress) {
+        // 判断对应的属性是否设置完毕
         validate();
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
@@ -295,6 +305,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            // 调用channelFactory创建Channel - 实现类是之前传进来的ReflectiveChannelFactory
+            // 创建的是 NioServerSocketChannel
             channel = channelFactory.newChannel();
             init(channel);
         } catch (Throwable t) {

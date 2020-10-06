@@ -41,6 +41,8 @@ import java.util.Map;
 /**
  * A {@link io.netty.channel.socket.ServerSocketChannel} implementation which uses
  * NIO selector based implementation to accept new connections.
+ *
+ * 一个基于NIO的selector来实现接收新连接的ServerSocketChannel
  */
 public class NioServerSocketChannel extends AbstractNioMessageChannel
                              implements io.netty.channel.socket.ServerSocketChannel {
@@ -71,6 +73,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance
      */
     public NioServerSocketChannel() {
+        // 传进去一个ServerSocketChannel,是用默认的SelectorProvider创建的
         this(newSocket(DEFAULT_SELECTOR_PROVIDER));
     }
 
@@ -85,7 +88,11 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance using the given {@link ServerSocketChannel}.
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
+        // 为ServerSocketChannel注册接收事件
         super(null, channel, SelectionKey.OP_ACCEPT);
+        // javaChannel()会返回刚刚注册进去的ServerSocketChannel,然后调用socket()方法创建一个与
+        // 当前ServerSocketChannel关联的ServerSocket.所以此处传入的参数为当前对象NioServerSocketChannel和ServerSocket
+        // 返回当前Channel的相关属性并设值
         config = new NioServerSocketChannelConfig(this, javaChannel().socket());
     }
 
